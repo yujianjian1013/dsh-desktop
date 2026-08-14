@@ -1,0 +1,9 @@
+# 依赖与构建产物不入库
+node_modules/
+dist/
+release-build/
+release/
+
+# 日志与临时文件
+*.log
+screenshot*.png
