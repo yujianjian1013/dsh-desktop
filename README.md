@@ -56,3 +56,12 @@ npm run pack:release   # 打包 + 打 zip 到 release/（对外发布）
 - 主进程：`main.js`（窗口、托盘、单实例、自动拉起服务、安装指引/离线页、站外链接交给系统浏览器）。
 - 页面由 Electron 内置 Chromium 渲染，与浏览器里访问 `http://127.0.0.1:3080` 完全一致。
 - 换端口：启动前设置环境变量 `DSH_URL`。
+
+## 更新记录
+
+### v1.1.1（2026-09-04）
+
+- **兼容 dsh web 0.1.2+ 的一次性 token 认证**：新版 `dsh web`（0.1.2-rc.1 起）在启动时打印带 `?token=...` 的一次性 URL，直接访问裸 `http://127.0.0.1:3080` 会被 401 拒绝。本版本在拉起服务后解析该 token URL 并用其加载主窗口，规避由此导致的黑屏。
+  - 新增 `serverTokenUrl`，监听 dsh web 的 stdout 解析 `dsh web: <url>` 中带 token 的完整 URL；
+  - 增加 `resolvedAppUrl()`，能拿到 token 时用之，否则回退裸 `APP_URL`（兼容旧版服务）；
+  - 主窗口初次加载与服务就绪后的加载均改用该函数。
