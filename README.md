@@ -59,6 +59,13 @@ npm run pack:release   # 打包 + 打 zip 到 release/（对外发布）
 
 ## 更新记录
 
+### v1.1.2（2026-09-04）
+
+- **修复 dsh web 0.1.2+ token 加载竞态导致的 401 黑屏**：v1.1.1 在服务端口就绪后立即用 `resolvedAppUrl()` 加载页面，但带一次性 token 的 URL 是 dsh web 启动后**异步打印到 stdout** 才被解析的——端口先通、token 行后到，于是仍会加载裸 URL 被 401 拒绝（黑屏）。
+  - `handleServerDown` 在端口就绪后先**等待 token URL 解析**（最多 10 秒，每 200ms 轮询 `serverTokenUrl`），解析到后才加载带 token 的地址完成一次性认证；
+  - 认证成功后 dsh web 会种下会话 cookie（约 30 天有效），此后正常使用与旧版一致；
+  - 对旧版 dsh web（无 token）行为不变：10 秒内解析不到 token 即回退加载裸 `APP_URL`。
+
 ### v1.1.1（2026-09-04）
 
 - **兼容 dsh web 0.1.2+ 的一次性 token 认证**：新版 `dsh web`（0.1.2-rc.1 起）在启动时打印带 `?token=...` 的一次性 URL，直接访问裸 `http://127.0.0.1:3080` 会被 401 拒绝。本版本在拉起服务后解析该 token URL 并用其加载主窗口，规避由此导致的黑屏。

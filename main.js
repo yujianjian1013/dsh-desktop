@@ -223,6 +223,12 @@ async function handleServerDown() {
   const u = new URL(APP_URL);
   const up = await waitUntilUp(u.hostname, u.port || 80);
   if (mainWindow && !mainWindow.isDestroyed()) {
+    // dsh web 0.1.2+：带一次性 token 的 URL 在服务启动后异步打印到 stdout。
+    // 端口先通、token 行后到会产生竞态，导致裸 URL 401 黑屏。
+    // 这里在端口就绪后再等 token 解析（最多 10 秒），解析到才用带 token 的
+    // 地址完成一次性认证（成功后种下会话 cookie，之后裸地址即可访问）。
+    const deadline = Date.now() + 10000;
+    while (!serverTokenUrl && Date.now() < deadline) await sleep(200);
     mainWindow.loadURL(up ? resolvedAppUrl() : offlinePage(APP_URL));
   }
 }
