@@ -18,6 +18,10 @@ let quitting = false;
 let spawnedServer = null;   // 我们启动的子进程
 let serverState = { checked: false };
 
+// 兼容 dsh web 0.1.2+ 的一次性 token 认证：进程启动时打印的启动 URL 带有
+// `?token=...`，裸 URL 会被 401 拒绝。这里保存从服务 stdout 解析出的完整 URL。
+let serverTokenUrl = null;
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- 单实例：重复启动时聚焦已有窗口 ----
@@ -92,6 +96,13 @@ async function ensureServer() {
     }
     proc.stdout.pipe(logFile);
     proc.stderr.pipe(logFile);
+    // 解析 dsh web 启动时打印的带 token 的 URL（形如 `dsh web: http://.../?token=...`），
+    // 供主窗口以正确的一次性 token 认证加载，规避新版裸 URL 401 黑屏。
+    proc.stdout.on('data', (chunk) => {
+      const text = chunk.toString();
+      const m = text.match(/dsh web: (\S+)/);
+      if (m && m[1]) serverTokenUrl = m[1];
+    });
     proc.on('error', (e) => { console.error('[dsh-desktop] spawn failed: ' + e.message); spawnedServer = null; });
     proc.on('exit', () => { spawnedServer = null; });
     spawnedServer = proc;
@@ -111,6 +122,13 @@ async function waitUntilUp(host, port, timeoutMs = 60000) {
     if (Date.now() - start > timeoutMs) return false;
     await sleep(1200);
   }
+}
+
+// ---- 决定实际加载的 URL ----
+// dsh web 0.1.2+ 要求带一次性 token 的启动 URL；解析到了就用它，
+// 否则回退到配置的裸 APP_URL（兼容旧版服务）。
+function resolvedAppUrl() {
+  return serverTokenUrl || APP_URL;
 }
 
 // ---- 服务未启动时的离线提示页（手动重试） ----
@@ -205,7 +223,7 @@ async function handleServerDown() {
   const u = new URL(APP_URL);
   const up = await waitUntilUp(u.hostname, u.port || 80);
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.loadURL(up ? APP_URL : offlinePage(APP_URL));
+    mainWindow.loadURL(up ? resolvedAppUrl() : offlinePage(APP_URL));
   }
 }
 
@@ -253,7 +271,7 @@ function createWindow() {
 
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  mainWindow.loadURL(APP_URL);
+  mainWindow.loadURL(resolvedAppUrl());
 
   // ---- 验证模式：`electron . --screenshot` 加载后截图退出 ----
   if (process.argv.includes('--screenshot')) {
